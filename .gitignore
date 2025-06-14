@@ -6,3 +6,4 @@ node_modules
 .cursor/
 taskmaster.md
 test-files/
+render-react.md

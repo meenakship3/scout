@@ -16,6 +16,9 @@ const EXCLUDE_PATTERNS = [
 	'**/coverage/**'
 ];
 
+// Track active webview panels
+const webviewPanels = new Map<string, vscode.WebviewPanel>();
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -44,9 +47,9 @@ export function activate(context: vscode.ExtensionContext) {
 			);
 
 			if (selectedFiles) {
-				vscode.window.showInformationMessage(
-					`Found ${selectedFiles.length} file(s) to scan. This will be implemented in the next step.`
-				);
+				for (const file of selectedFiles) {
+					await displayFileInWebview(file.filePath, context);
+				}
 			}
 		} catch (error) {
 			vscode.window.showErrorMessage(`Error scanning workspace: ${error}`);
@@ -54,6 +57,69 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	context.subscriptions.push(scanCommand);
+}
+
+// Display file content in a webview panel
+async function displayFileInWebview(filePath: string, context: vscode.ExtensionContext) {
+	try {
+		// Check if we already have a panel for this file
+		const existingPanel = webviewPanels.get(filePath);
+		if (existingPanel) {
+			existingPanel.reveal();
+			return;
+		}
+
+		// Read the file content
+		const content = await fs.promises.readFile(filePath, 'utf8');
+		const fileName = path.basename(filePath);
+
+		// Create and show a new webview panel
+		const panel = vscode.window.createWebviewPanel(
+			'htmlPreview',
+			`Preview: ${fileName}`,
+			vscode.ViewColumn.Beside,
+			{
+				enableScripts: true,
+				retainContextWhenHidden: true
+			}
+		);
+
+		// Set the webview content
+		panel.webview.html = getWebviewContent(content);
+
+		// Handle panel disposal
+		panel.onDidDispose(() => {
+			webviewPanels.delete(filePath);
+		});
+
+		// Store the panel reference
+		webviewPanels.set(filePath, panel);
+	} catch (error) {
+		vscode.window.showErrorMessage(`Error displaying file: ${error}`);
+	}
+}
+
+// Generate webview content with white background
+function getWebviewContent(htmlContent: string): string {
+	return `<!DOCTYPE html>
+		<html>
+		<head>
+			<meta charset="UTF-8">
+			<meta name="viewport" content="width=device-width, initial-scale=1.0">
+			<style>
+				html {
+					background-color: white;
+				}
+				/* Apply default text color based on VS Code theme classes */
+				body {
+					color: black;
+				}
+			</style>
+		</head>
+		<body>
+			${htmlContent}
+		</body>
+		</html>`;
 }
 
 // Find all relevant files in the workspace
