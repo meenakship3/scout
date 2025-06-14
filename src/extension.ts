@@ -325,7 +325,7 @@ class AccessibilityCodeActionProvider implements vscode.CodeActionProvider {
 		for (const diagnostic of context.diagnostics) {
 			if (diagnostic.source === 'Accessibility' && (diagnostic as AccessibilityDiagnostic).data) {
 				const action = new vscode.CodeAction(
-					'Get AI fix for accessibility issue',
+					'Fix with Scout',
 					vscode.CodeActionKind.QuickFix
 				);
 				action.diagnostics = [diagnostic];
@@ -381,6 +381,7 @@ vscode.commands.registerCommand('scout.getAIFix', async (document: vscode.TextDo
 			vscode.window.showWarningMessage('AI generated fix was not valid. Please review manually.');
 		}
 	} catch (error) {
+		console.error('[Scout] Error in getAIFix command:', error instanceof Error ? error.message : 'Unknown error');
 		vscode.window.showErrorMessage(`Error getting AI fix: ${error}`);
 	}
 });

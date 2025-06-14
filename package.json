@@ -32,6 +32,10 @@
       {
         "command": "scout.verifyApiKey",
         "title": "Scout: Verify MistralAI API Key"
+      },
+      {
+        "command": "scout.getAIFix",
+        "title": "Scout: Get AI Fix for Accessibility Issue"
       }
     ],
     "configuration": {
