@@ -1,0 +1,139 @@
+import MistralClient from '@mistralai/mistralai';
+import * as vscode from 'vscode';
+
+export class AIService {
+    private client: MistralClient | null = null;
+
+    constructor() {
+        this.initializeClient();
+    }
+
+    private initializeClient() {
+        const config = vscode.workspace.getConfiguration('scout');
+        const apiKey = config.get<string>('mistralApiKey');
+
+        if (apiKey) {
+            this.client = new MistralClient(apiKey);
+        }
+    }
+
+    public async testConnection(prompt: string): Promise<boolean> {
+        if (!this.client) {
+            throw new Error('MistralAI client not initialized. Please set your API key in settings.');
+        }
+
+        try {
+            const response = await this.client.chat({
+                model: 'mistral-small',
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: 0.1
+            });
+
+            return response.choices[0]?.message?.content !== undefined;
+        } catch (error) {
+            console.error('Error testing connection:', error);
+            throw error;
+        }
+    }
+
+    public async getAccessibilityFix(
+        originalNodeHtml: string,
+        issue: {
+            id: string;
+            description: string;
+            help: string;
+            impact: string;
+        }
+    ): Promise<string | null> {
+        if (!this.client) {
+            throw new Error('MistralAI client not initialized. Please set your API key in settings.');
+        }
+
+        try {
+            const prompt = `You are an expert in web development, with specialized knowledge in web accessibility. Your role is to ensure that all web content and interfaces are usable by as many people as possible, including those with disabilities. You will be provided with an HTML snippet representing a specific element that has an accessibility issue. Your task is to fix the accessibility issue by returning *only* the corrected HTML for that element. Apply best practices for web accessibility as defined by the latest WCAG (Web Content Accessibility Guidelines), and ensure your solutions are consistent with modern web development standards.
+
+Issue: ${issue.description}
+Impact: ${issue.impact}
+Help: ${issue.help}
+
+Original HTML element snippet:
+${originalNodeHtml}
+
+Return only the fixed HTML for the element. Do not include any explanations, comments, or additional text outside of the HTML. The response must be a complete and valid HTML snippet for the element that resolves the stated accessibility issue. Ensure that:
+1. The original tag name (e.g., div, img, p) is preserved unless explicitly required for the fix (e.g., changing a div to a button for semantic correctness).
+2. Only the necessary modifications are made to fix the accessibility issue.
+3. The returned HTML is syntactically correct and well-formed.`;
+
+            const response = await this.client.chat({
+                model: 'mistral-small',
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: 0.1 // Low temperature for more deterministic responses
+            });
+
+            return response.choices[0]?.message?.content || null;
+        } catch (error) {
+            console.error('Error getting AI fix:', error);
+            throw error;
+        }
+    }
+
+    public async validateFix(
+        originalSnippet: string,
+        fixedSnippet: string,
+        issue: {
+            id: string;
+            description: string;
+        }
+    ): Promise<boolean> {
+        if (!this.client) {
+            throw new Error('MistralAI client not initialized. Please set your API key in settings.');
+        }
+
+        try {
+            const prompt = `You are an accessibility expert. Validate if the following fixed HTML snippet correctly addresses the accessibility issue when replacing the original snippet:
+
+Issue: ${issue.description}
+
+Original HTML snippet:
+${originalSnippet}
+
+Fixed HTML snippet:
+${fixedSnippet}
+
+Check the following:
+1. The fixed snippet addresses the specific accessibility issue.
+2. The fixed snippet is valid and well-formed HTML.
+3. The fixed snippet maintains the original functionality where applicable.
+4. The fixed snippet follows WCAG guidelines.
+
+Respond with only "true" if all checks pass, or "false" if any check fails.`;
+
+            const response = await this.client.chat({
+                model: 'mistral-small',
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: 0.1
+            });
+
+            const answer = response.choices[0]?.message?.content?.toLowerCase().trim();
+            return answer === 'true';
+        } catch (error) {
+            console.error('Error validating fix:', error);
+            throw error;
+        }
+    }
+} 

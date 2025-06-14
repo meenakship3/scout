@@ -28,8 +28,22 @@
       {
         "command": "scout.scanWorkspace",
         "title": "Scout: Scan Workspace for Accessibility Issues"
+      },
+      {
+        "command": "scout.verifyApiKey",
+        "title": "Scout: Verify MistralAI API Key"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Scout",
+      "properties": {
+        "scout.mistralApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "MistralAI API key for generating accessibility fixes"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -58,6 +72,7 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
-    "axe-core": "^4.8.3"
+    "axe-core": "^4.8.3",
+    "@mistralai/mistralai": "^0.0.10"
   }
 }

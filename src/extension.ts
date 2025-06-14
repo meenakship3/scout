@@ -4,6 +4,15 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as axe from 'axe-core';
+import { AIService } from './ai-service';
+
+// Extend Diagnostic type to include our custom data
+interface AccessibilityDiagnostic extends vscode.Diagnostic {
+	data?: {
+		violation: axe.Result;
+		node: axe.NodeResult;
+	};
+}
 
 // File patterns to scan
 const SCAN_PATTERNS = ['**/*.html'];
@@ -24,14 +33,16 @@ const webviewPanels = new Map<string, vscode.WebviewPanel>();
 
 // Create a diagnostic collection for accessibility issues
 let accessibilityDiagnostics: vscode.DiagnosticCollection;
+let aiService: AIService;
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Scout accessibility assistant is now active');
 
-	// Initialize the diagnostic collection
+	// Initialize services
 	accessibilityDiagnostics = vscode.languages.createDiagnosticCollection('accessibility');
+	aiService = new AIService();
 
 	// Register the scan workspace command
 	const scanCommand = vscode.commands.registerCommand('scout.scanWorkspace', async () => {
@@ -65,7 +76,39 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	context.subscriptions.push(scanCommand);
+	// Register code action provider for accessibility fixes
+	const codeActionProvider = vscode.languages.registerCodeActionsProvider(
+		['html', 'jsx', 'tsx'],
+		new AccessibilityCodeActionProvider(),
+		{
+			providedCodeActionKinds: [vscode.CodeActionKind.QuickFix]
+		}
+	);
+
+	// Register verify API key command
+	const verifyApiKeyCommand = vscode.commands.registerCommand('scout.verifyApiKey', async () => {
+		try {
+			const config = vscode.workspace.getConfiguration('scout');
+			const apiKey = config.get<string>('mistralApiKey');
+
+			if (!apiKey) {
+				vscode.window.showErrorMessage('MistralAI API key not found. Please set it in your user settings.');
+				return;
+			}
+
+			// Test the API key with a simple request
+			const testPrompt = 'Test connection';
+			const response = await aiService.testConnection(testPrompt);
+			
+			if (response) {
+				vscode.window.showInformationMessage('MistralAI API key is valid and working!');
+			}
+		} catch (error) {
+			vscode.window.showErrorMessage(`API key verification failed: ${error}`);
+		}
+	});
+
+	context.subscriptions.push(scanCommand, codeActionProvider, verifyApiKeyCommand);
 }
 
 // Display file content in a webview panel
@@ -104,7 +147,8 @@ async function displayFileInWebview(filePath: string, context: vscode.ExtensionC
 			async message => {
 				switch (message.type) {
 					case 'accessibilityResults':
-						handleAccessibilityResults(message.results, filePath);
+						// Pass the file content along with results
+						handleAccessibilityResults(message.results, filePath, content);
 						break;
 				}
 			},
@@ -173,9 +217,11 @@ function getWebviewContent(htmlContent: string, context: vscode.ExtensionContext
 }
 
 // Handle accessibility results and create diagnostics
-function handleAccessibilityResults(results: axe.AxeResults, filePath: string) {
-	const diagnostics: vscode.Diagnostic[] = [];
+function handleAccessibilityResults(results: axe.AxeResults, filePath: string, fileContent: string) {
+	const diagnostics: AccessibilityDiagnostic[] = [];
 	const uri = vscode.Uri.file(filePath);
+	// Use a Set to track unique diagnostic ranges to avoid duplicate quick fixes
+	const uniqueDiagnosticLocations = new Set<string>();
 
 	// Log the results for debugging
 	console.log('Received accessibility results for', filePath, results);
@@ -183,20 +229,51 @@ function handleAccessibilityResults(results: axe.AxeResults, filePath: string) {
 	// Process each violation
 	for (const violation of results.violations) {
 		for (const node of violation.nodes) {
-			// Set diagnostic range to the first line (temporary MVP solution)
+			let line = 0;
+			let character = 0;
+
+			// Attempt to find the line and character of the problematic node's HTML
+			if (node.html) {
+				const htmlSnippet = node.html;
+				const index = fileContent.indexOf(htmlSnippet);
+				if (index !== -1) {
+					const lines = fileContent.substring(0, index).split('\n');
+					line = lines.length - 1;
+					character = lines[lines.length - 1].length;
+				}
+			}
+
+			// Create a unique key for this diagnostic based on file path, line, and character.
+			// This ensures only one quick fix is offered per unique starting position in the editor,
+			// even if multiple axe-core issues are found for the same element.
+			const diagnosticKey = `${filePath}:${line}:${character}`;
+
+			// If a diagnostic for this exact location already exists, skip adding a new one that triggers quick fix.
+			// All axe-core issues will still be logged and can be seen in the Problems panel, but the lightbulb
+			// will only show one 'Get AI fix' action per location.
+			if (uniqueDiagnosticLocations.has(diagnosticKey)) {
+				continue;
+			}
+			uniqueDiagnosticLocations.add(diagnosticKey);
+
 			const diagnostic = new vscode.Diagnostic(
-				new vscode.Range(0, 0, 0, 100),
+				new vscode.Range(line, character, line, character + (node.html?.length || 1)), 
 				`${violation.help}: ${violation.description}\nSelector: ${node.target.join(', ')}`,
 				vscode.DiagnosticSeverity.Warning
-			);
+			) as AccessibilityDiagnostic;
 			diagnostic.source = 'Accessibility';
 			diagnostic.code = violation.id;
 			diagnostic.relatedInformation = [
 				new vscode.DiagnosticRelatedInformation(
-					new vscode.Location(uri, new vscode.Range(0, 0, 0, 100)),
+					new vscode.Location(uri, new vscode.Range(line, character, line, character + (node.html?.length || 1))), 
 					`Impact: ${violation.impact}`
 				)
 			];
+			// Add custom data for AI fixes
+			diagnostic.data = {
+				violation,
+				node
+			};
 			diagnostics.push(diagnostic);
 		}
 	}
@@ -234,3 +311,76 @@ async function findRelevantFiles(): Promise<string[]> {
 export function deactivate() {
 	accessibilityDiagnostics.dispose();
 }
+
+// Code action provider for accessibility fixes
+class AccessibilityCodeActionProvider implements vscode.CodeActionProvider {
+	public async provideCodeActions(
+		document: vscode.TextDocument,
+		range: vscode.Range,
+		context: vscode.CodeActionContext,
+		token: vscode.CancellationToken
+	): Promise<vscode.CodeAction[]> {
+		const actions: vscode.CodeAction[] = [];
+
+		for (const diagnostic of context.diagnostics) {
+			if (diagnostic.source === 'Accessibility' && (diagnostic as AccessibilityDiagnostic).data) {
+				const action = new vscode.CodeAction(
+					'Get AI fix for accessibility issue',
+					vscode.CodeActionKind.QuickFix
+				);
+				action.diagnostics = [diagnostic];
+				action.command = {
+					command: 'scout.getAIFix',
+					title: 'Get AI fix',
+					arguments: [document, diagnostic]
+				};
+				actions.push(action);
+			}
+		}
+
+		return actions;
+	}
+}
+
+// Register the AI fix command
+vscode.commands.registerCommand('scout.getAIFix', async (document: vscode.TextDocument, diagnostic: AccessibilityDiagnostic) => {
+	try {
+		if (!diagnostic.data || !diagnostic.range) {
+			throw new Error('No accessibility data or range found in diagnostic');
+		}
+
+		const { violation, node } = diagnostic.data;
+		
+		// Get AI fix for the specific node HTML
+		const fixedCode = await aiService.getAccessibilityFix(node.html || '', {
+			id: violation.id,
+			description: violation.description,
+			help: violation.help,
+			impact: violation.impact || 'moderate'
+		});
+
+		if (!fixedCode) {
+			throw new Error('No fix was generated');
+		}
+
+		// Validate the fix for the specific snippet
+		const isValid = await aiService.validateFix(node.html || '', fixedCode as string, {
+			id: violation.id,
+			description: violation.description
+		});
+
+		if (isValid) {
+			// Create a workspace edit to replace only the problematic element
+			const edit = new vscode.WorkspaceEdit();
+			edit.replace(document.uri, diagnostic.range, fixedCode as string);
+
+			// Apply the edit
+			await vscode.workspace.applyEdit(edit);
+			vscode.window.showInformationMessage('Accessibility fix applied successfully!');
+		} else {
+			vscode.window.showWarningMessage('AI generated fix was not valid. Please review manually.');
+		}
+	} catch (error) {
+		vscode.window.showErrorMessage(`Error getting AI fix: ${error}`);
+	}
+});
