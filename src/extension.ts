@@ -221,8 +221,31 @@ export function activate(context: vscode.ExtensionContext) {
 				// Apply the edit
 				await vscode.workspace.applyEdit(edit);
 				
-				// The file change watcher will automatically trigger a re-analysis
-				vscode.window.showInformationMessage('Accessibility fix applied successfully!');
+				// Store the original content for potential undo
+				const originalContent = document.getText();
+				
+				// Show message with buttons
+				const message = await vscode.window.showInformationMessage(
+					'Accessibility fix applied successfully!',
+					{ modal: false },
+					'Accept Changes',
+					'Reject Changes'
+				);
+
+				if (message === 'Reject Changes') {
+					// Create a new edit to revert the changes
+					const undoEdit = new vscode.WorkspaceEdit();
+					undoEdit.replace(
+						document.uri,
+						new vscode.Range(
+							document.positionAt(0),
+							document.positionAt(document.getText().length)
+						),
+						originalContent
+					);
+					await vscode.workspace.applyEdit(undoEdit);
+					vscode.window.showInformationMessage('Changes have been reverted.');
+				}
 			} else {
 				vscode.window.showWarningMessage('AI generated fix was not valid. Please review manually.');
 			}
