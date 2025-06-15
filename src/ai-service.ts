@@ -85,7 +85,7 @@ Fix this list item accessibility issue:
 ${originalNodeHtml}
 
 Instructions:
-- Wrap the <li> in an <ol> (ordered list) element
+- Wrap the <li> in an <ul> (unordered list) element
 - Keep existing content and attributes
 - Return ONLY the fixed HTML, no explanations or alternatives
 - Do not include markdown code blocks or backticks
