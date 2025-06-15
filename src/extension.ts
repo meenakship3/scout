@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as axe from 'axe-core';
 import { AIService } from './ai-service';
+import * as beautify from 'js-beautify';
 
 // Extend Diagnostic type to include our custom data
 interface AccessibilityDiagnostic extends vscode.Diagnostic {
@@ -229,6 +230,31 @@ export function activate(context: vscode.ExtensionContext) {
 				// Apply the edit
 				await vscode.workspace.applyEdit(edit);
 				
+				// Format the entire document
+				const formattedContent = beautify.html(document.getText(), {
+					indent_size: 2,
+					wrap_line_length: 100,
+					preserve_newlines: true,
+					max_preserve_newlines: 2,
+					unformatted: ['code', 'pre', 'em', 'strong', 'span'],
+					indent_inner_html: true,
+					indent_scripts: 'keep'
+				});
+
+				// Create a new edit to apply the formatting
+				const formatEdit = new vscode.WorkspaceEdit();
+				formatEdit.replace(
+					document.uri,
+					new vscode.Range(
+						document.positionAt(0),
+						document.positionAt(document.getText().length)
+					),
+					formattedContent
+				);
+
+				// Apply the formatting
+				await vscode.workspace.applyEdit(formatEdit);
+				
 				// Show message with buttons
 				const message = await vscode.window.showInformationMessage(
 					'Accessibility fix applied successfully!',
@@ -256,7 +282,13 @@ export function activate(context: vscode.ExtensionContext) {
 						vscode.window.showErrorMessage('Failed to revert changes.');
 					}
 				} else { // User accepted changes or dismissed the message
+					// Save the document
 					await document.save();
+					// Ensure the file is saved to disk
+					await vscode.workspace.fs.writeFile(
+						document.uri,
+						Buffer.from(document.getText())
+					);
 				}
 			} else {
 				vscode.window.showWarningMessage('AI generated fix was not valid. Please review manually.');
@@ -359,6 +391,32 @@ export function activate(context: vscode.ExtensionContext) {
 				// Apply all changes at once
 				if (fixedCount > 0) {
 					await vscode.workspace.applyEdit(edit);
+
+					// Format the entire document
+					const formattedContent = beautify.html(document.getText(), {
+						indent_size: 2,
+						wrap_line_length: 100,
+						preserve_newlines: true,
+						max_preserve_newlines: 2,
+						unformatted: ['code', 'pre', 'em', 'strong', 'span'],
+						indent_inner_html: true,
+						indent_scripts: 'keep'
+					});
+
+					// Create a new edit to apply the formatting
+					const formatEdit = new vscode.WorkspaceEdit();
+					formatEdit.replace(
+						document.uri,
+						new vscode.Range(
+							document.positionAt(0),
+							document.positionAt(document.getText().length)
+						),
+						formattedContent
+					);
+
+					// Apply the formatting
+					await vscode.workspace.applyEdit(formatEdit);
+
 					return { status: 'fixed', count: fixedCount, originalContent: originalContentBeforeFix };
 				} else {
 					return { status: 'no_fixes', count: 0 };
@@ -392,7 +450,13 @@ export function activate(context: vscode.ExtensionContext) {
 						vscode.window.showErrorMessage('Failed to revert changes.');
 					}
 				} else { // User accepted changes or dismissed the message
+					// Save the document
 					await document.save();
+					// Ensure the file is saved to disk
+					await vscode.workspace.fs.writeFile(
+						document.uri,
+						Buffer.from(document.getText())
+					);
 				}
 			} else if (fixResult.status === 'no_fixes') {
 				vscode.window.showWarningMessage('No accessibility issues were fixed.');

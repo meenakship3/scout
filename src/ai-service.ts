@@ -89,7 +89,9 @@ Instructions:
 - Keep existing content and attributes
 - Return ONLY the fixed HTML, no explanations or alternatives
 - Do not include markdown code blocks or backticks
-- Do not provide multiple options, just use <ul>`;
+- Do not provide multiple options, just use <ul>
+- Do not include any text before or after the HTML
+- Do not explain what you did, just return the HTML`;
             } else if (issue.id === 'image-alt') {
                 console.log('[Scout AI Service] Using specialized prompt for image alt text');
                 prompt = `You are an expert web developer with extensive experience in improving web accessibility.
