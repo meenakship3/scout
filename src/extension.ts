@@ -300,10 +300,29 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 
 	// Register the Fix All command
-	vscode.commands.registerCommand('scout.fixAll', async (document: vscode.TextDocument) => {
+	vscode.commands.registerCommand('scout.fixAll', async (document?: vscode.TextDocument) => {
 		try {
+			// If document is not provided, get the active document
+			if (!document) {
+				const activeEditor = vscode.window.activeTextEditor;
+				if (!activeEditor) {
+					vscode.window.showErrorMessage('No active editor found. Please open an HTML/JSX/TSX file.');
+					return;
+				}
+				document = activeEditor.document;
+			}
+
+			// Ensure we have a valid document
+			if (!document) {
+				vscode.window.showErrorMessage('No valid document found. Please open an HTML/JSX/TSX file.');
+				return;
+			}
+
+			// At this point, document is guaranteed to be defined
+			const doc = document;
+
 			// Get all accessibility diagnostics for the current document
-			const allDiagnostics = accessibilityDiagnostics.get(document.uri) || [];
+			const allDiagnostics = accessibilityDiagnostics.get(doc.uri) || [];
 			const filteredDiagnostics = allDiagnostics.filter((d: vscode.Diagnostic) => d.source === 'Accessibility') as AccessibilityDiagnostic[];
 
 			if (filteredDiagnostics.length === 0) {
@@ -320,7 +339,7 @@ export function activate(context: vscode.ExtensionContext) {
 				// Create a workspace edit to hold all changes
 				const edit = new vscode.WorkspaceEdit();
 				let fixedCount = 0;
-				const originalContentBeforeFix = document.getText(); // Capture content before any changes
+				const originalContentBeforeFix = doc.getText();
 
 				// Process each diagnostic
 				for (const diagnostic of filteredDiagnostics) {
@@ -361,7 +380,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 						if (isValid) {
 							// Find the exact location of the element
-							const documentText = document.getText();
+							const documentText = doc.getText();
 							const nodeHtml = node.html || '';
 							const startIndex = documentText.indexOf(nodeHtml);
 							
@@ -370,12 +389,12 @@ export function activate(context: vscode.ExtensionContext) {
 							}
 							
 							const endIndex = startIndex + nodeHtml.length;
-							const startPosition = document.positionAt(startIndex);
-							const endPosition = document.positionAt(endIndex);
+							const startPosition = doc.positionAt(startIndex);
+							const endPosition = doc.positionAt(endIndex);
 							
 							// Add the fix to the workspace edit
 							edit.replace(
-								document.uri,
+								doc.uri,
 								new vscode.Range(startPosition, endPosition),
 								fixedCode
 							);
@@ -393,7 +412,7 @@ export function activate(context: vscode.ExtensionContext) {
 					await vscode.workspace.applyEdit(edit);
 
 					// Format the entire document
-					const formattedContent = beautify.html(document.getText(), {
+					const formattedContent = beautify.html(doc.getText(), {
 						indent_size: 2,
 						wrap_line_length: 100,
 						preserve_newlines: true,
@@ -406,10 +425,10 @@ export function activate(context: vscode.ExtensionContext) {
 					// Create a new edit to apply the formatting
 					const formatEdit = new vscode.WorkspaceEdit();
 					formatEdit.replace(
-						document.uri,
+						doc.uri,
 						new vscode.Range(
-							document.positionAt(0),
-							document.positionAt(document.getText().length)
+							doc.positionAt(0),
+							doc.positionAt(doc.getText().length)
 						),
 						formattedContent
 					);
@@ -436,10 +455,10 @@ export function activate(context: vscode.ExtensionContext) {
 					// Create a new edit to revert the changes
 					const undoEdit = new vscode.WorkspaceEdit();
 					undoEdit.replace(
-						document.uri,
+						doc.uri,
 						new vscode.Range(
-							document.positionAt(0),
-							document.positionAt(document.getText().length)
+							doc.positionAt(0),
+							doc.positionAt(doc.getText().length)
 						),
 						fixResult.originalContent
 					);
@@ -451,11 +470,11 @@ export function activate(context: vscode.ExtensionContext) {
 					}
 				} else { // User accepted changes or dismissed the message
 					// Save the document
-					await document.save();
+					await doc.save();
 					// Ensure the file is saved to disk
 					await vscode.workspace.fs.writeFile(
-						document.uri,
-						Buffer.from(document.getText())
+						doc.uri,
+						Buffer.from(doc.getText())
 					);
 				}
 			} else if (fixResult.status === 'no_fixes') {

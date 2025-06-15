@@ -42,6 +42,19 @@
         "title": "Scout: Fix All Accessibility Issues"
       }
     ],
+    "keybindings": [
+      {
+        "command": "scout.scanWorkspace",
+        "key": "cmd+shift+a",
+        "mac": "cmd+shift+a"
+      },
+      {
+        "command": "scout.fixAll",
+        "key": "cmd+shift+x",
+        "mac": "cmd+shift+x",
+        "when": "editorLangId == html || editorLangId == jsx || editorLangId == tsx"
+      }
+    ],
     "configuration": {
       "title": "Scout",
       "properties": {
