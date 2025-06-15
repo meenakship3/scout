@@ -447,8 +447,24 @@ vscode.commands.registerCommand('scout.getAIFix', async (document: vscode.TextDo
 					fixedCode as string
 				);
 			} else {
-				// For other issues, replace only the problematic element
-				edit.replace(document.uri, diagnostic.range, fixedCode as string);
+				// For other issues, find the exact location of the element using the node's target
+				const documentText = document.getText();
+				const nodeHtml = node.html || '';
+				const startIndex = documentText.indexOf(nodeHtml);
+				
+				if (startIndex === -1) {
+					throw new Error('Could not find the element in the document');
+				}
+				
+				const endIndex = startIndex + nodeHtml.length;
+				const startPosition = document.positionAt(startIndex);
+				const endPosition = document.positionAt(endIndex);
+				
+				edit.replace(
+					document.uri,
+					new vscode.Range(startPosition, endPosition),
+					fixedCode as string
+				);
 			}
 
 			// Apply the edit
@@ -461,6 +477,6 @@ vscode.commands.registerCommand('scout.getAIFix', async (document: vscode.TextDo
 		}
 	} catch (error) {
 		console.error('[Scout] Error in getAIFix command:', error instanceof Error ? error.message : 'Unknown error');
-		vscode.window.showErrorMessage(`Error getting AI fix: ${error}`);
+		vscode.window.showErrorMessage("Error getting AI fix");
 	}
 });
