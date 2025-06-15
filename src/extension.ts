@@ -100,7 +100,15 @@ export function activate(context: vscode.ExtensionContext) {
 	// Register the scan workspace command
 	const scanCommand = vscode.commands.registerCommand('scout.scanWorkspace', async () => {
 		try {
+			// Show message immediately
+			const messageDisposable = vscode.window.setStatusBarMessage('Searching for HTML/JSX/TSX files...');
+			
+			// Search for files
 			const files = await findRelevantFiles();
+			
+			// Dismiss the message
+			messageDisposable.dispose();
+
 			if (files.length === 0) {
 				vscode.window.showInformationMessage('No HTML/JSX/CSS files found in the workspace.');
 				return;
@@ -115,7 +123,8 @@ export function activate(context: vscode.ExtensionContext) {
 				})),
 				{
 					canPickMany: true,
-					placeHolder: 'Select files to scan for accessibility issues'
+					placeHolder: 'Select files to scan for accessibility issues',
+					ignoreFocusOut: true
 				}
 			);
 
@@ -170,6 +179,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 			const { violation, node } = diagnostic.data;
 			
+			// Show in-progress message
+			vscode.window.showInformationMessage('Analyzing and fixing the accessibility issue...');
+
 			// Get AI fix for the specific node HTML
 			const fixedCode = await aiService.getAccessibilityFix(node.html || '', {
 				id: violation.id,
