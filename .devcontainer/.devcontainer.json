@@ -1,0 +1,19 @@
+{
+  "name": "Scout Extension",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:0-18",
+  "forwardPorts": [],
+  "postCreateCommand": "npm install",
+  "secrets": {
+    "MISTRALAI_API_KEY": {
+      "description": "Your MistralAI API key for Scout to generate accessibility fixes.",
+      "documentationUrl": "https://docs.mistral.ai/api/"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}
