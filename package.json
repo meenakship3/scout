@@ -36,6 +36,10 @@
       {
         "command": "scout.getAIFix",
         "title": "Scout: Get AI Fix for Accessibility Issue"
+      },
+      {
+        "command": "scout.fixAll",
+        "title": "Scout: Fix All Accessibility Issues"
       }
     ],
     "configuration": {

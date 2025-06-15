@@ -155,6 +155,185 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	// Register the AI fix command
+	vscode.commands.registerCommand('scout.getAIFix', async (document: vscode.TextDocument, diagnostic: AccessibilityDiagnostic) => {
+		try {
+			if (!diagnostic.data || !diagnostic.range) {
+				throw new Error('No accessibility data or range found in diagnostic');
+			}
+
+			const { violation, node } = diagnostic.data;
+			
+			// Get AI fix for the specific node HTML
+			const fixedCode = await aiService.getAccessibilityFix(node.html || '', {
+				id: violation.id,
+				description: violation.description,
+				help: violation.help,
+				impact: violation.impact || 'moderate'
+			});
+
+			if (!fixedCode) {
+				throw new Error('No fix was generated');
+			}
+
+			// Validate the fix
+			const isValid = await aiService.validateFix(fixedCode as string, {
+				id: violation.id,
+				description: violation.description,
+				help: violation.help
+			});
+
+			if (isValid) {
+				// Create a workspace edit
+				const edit = new vscode.WorkspaceEdit();
+				
+				// For main landmark issues, replace the entire document
+				if (violation.id === 'landmark-one-main') {
+					edit.replace(
+						document.uri,
+						new vscode.Range(
+							document.positionAt(0),
+							document.positionAt(document.getText().length)
+						),
+						fixedCode as string
+					);
+				} else {
+					// For other issues, find the exact location of the element using the node's target
+					const documentText = document.getText();
+					const nodeHtml = node.html || '';
+					const startIndex = documentText.indexOf(nodeHtml);
+					
+					if (startIndex === -1) {
+						throw new Error('Could not find the element in the document');
+					}
+					
+					const endIndex = startIndex + nodeHtml.length;
+					const startPosition = document.positionAt(startIndex);
+					const endPosition = document.positionAt(endIndex);
+					
+					edit.replace(
+						document.uri,
+						new vscode.Range(startPosition, endPosition),
+						fixedCode as string
+					);
+				}
+
+				// Apply the edit
+				await vscode.workspace.applyEdit(edit);
+				
+				// The file change watcher will automatically trigger a re-analysis
+				vscode.window.showInformationMessage('Accessibility fix applied successfully!');
+			} else {
+				vscode.window.showWarningMessage('AI generated fix was not valid. Please review manually.');
+			}
+		} catch (error) {
+			console.error('[Scout] Error in getAIFix command:', error instanceof Error ? error.message : 'Unknown error');
+			vscode.window.showErrorMessage("Error getting AI fix");
+		}
+	});
+
+	// Register the Fix All command
+	vscode.commands.registerCommand('scout.fixAll', async (document: vscode.TextDocument) => {
+		try {
+			// Get all accessibility diagnostics for the current document
+			const allDiagnostics = accessibilityDiagnostics.get(document.uri) || [];
+			const filteredDiagnostics = allDiagnostics.filter((d: vscode.Diagnostic) => d.source === 'Accessibility') as AccessibilityDiagnostic[];
+
+			if (filteredDiagnostics.length === 0) {
+				vscode.window.showInformationMessage('No accessibility issues found to fix.');
+				return;
+			}
+
+			// Show progress
+			await vscode.window.withProgress({
+				location: vscode.ProgressLocation.Notification,
+				title: "Fixing accessibility issues...",
+				cancellable: true
+			}, async (progress, token) => {
+				// Create a workspace edit to hold all changes
+				const edit = new vscode.WorkspaceEdit();
+				let fixedCount = 0;
+
+				// Process each diagnostic
+				for (const diagnostic of filteredDiagnostics) {
+					if (token.isCancellationRequested) {
+						break;
+					}
+
+					if (!diagnostic.data || !diagnostic.range) {
+						continue;
+					}
+
+					const { violation, node } = diagnostic.data;
+					
+					// Only process label, image-alt, and listitem issues
+					if (!['label', 'image-alt', 'listitem'].includes(violation.id)) {
+						continue;
+					}
+
+					try {
+						// Get AI fix
+						const fixedCode = await aiService.getAccessibilityFix(node.html || '', {
+							id: violation.id,
+							description: violation.description,
+							help: violation.help,
+							impact: violation.impact || 'moderate'
+						});
+
+						if (!fixedCode) {
+							continue;
+						}
+
+						// Validate the fix
+						const isValid = await aiService.validateFix(fixedCode, {
+							id: violation.id,
+							description: violation.description,
+							help: violation.help
+						});
+
+						if (isValid) {
+							// Find the exact location of the element
+							const documentText = document.getText();
+							const nodeHtml = node.html || '';
+							const startIndex = documentText.indexOf(nodeHtml);
+							
+							if (startIndex === -1) {
+								continue;
+							}
+							
+							const endIndex = startIndex + nodeHtml.length;
+							const startPosition = document.positionAt(startIndex);
+							const endPosition = document.positionAt(endIndex);
+							
+							// Add the fix to the workspace edit
+							edit.replace(
+								document.uri,
+								new vscode.Range(startPosition, endPosition),
+								fixedCode
+							);
+
+							fixedCount++;
+							progress.report({ increment: 100 / filteredDiagnostics.length });
+						}
+					} catch (error) {
+						console.error(`[Scout] Error fixing issue ${violation.id}:`, error);
+					}
+				}
+
+				// Apply all changes at once
+				if (fixedCount > 0) {
+					await vscode.workspace.applyEdit(edit);
+					vscode.window.showInformationMessage(`Successfully fixed ${fixedCount} accessibility issues!`);
+				} else {
+					vscode.window.showWarningMessage('No accessibility issues were fixed.');
+				}
+			});
+		} catch (error) {
+			console.error('[Scout] Error in fixAll command:', error instanceof Error ? error.message : 'Unknown error');
+			vscode.window.showErrorMessage("Error fixing accessibility issues");
+		}
+	});
+
 	context.subscriptions.push(scanCommand, codeActionProvider, verifyApiKeyCommand, fileWatcher);
 }
 
@@ -384,6 +563,21 @@ class AccessibilityCodeActionProvider implements vscode.CodeActionProvider {
 	): Promise<vscode.CodeAction[]> {
 		const actions: vscode.CodeAction[] = [];
 
+		// Add "Fix All" action if there are any accessibility diagnostics
+		if (context.diagnostics.some(d => d.source === 'Accessibility')) {
+			const fixAllAction = new vscode.CodeAction(
+				'Fix All with Scout',
+				vscode.CodeActionKind.QuickFix
+			);
+			fixAllAction.command = {
+				command: 'scout.fixAll',
+				title: 'Fix all accessibility issues',
+				arguments: [document]
+			};
+			actions.push(fixAllAction);
+		}
+
+		// Add individual fix actions
 		for (const diagnostic of context.diagnostics) {
 			if (diagnostic.source === 'Accessibility' && (diagnostic as AccessibilityDiagnostic).data) {
 				const action = new vscode.CodeAction(
@@ -403,80 +597,3 @@ class AccessibilityCodeActionProvider implements vscode.CodeActionProvider {
 		return actions;
 	}
 }
-
-// Register the AI fix command
-vscode.commands.registerCommand('scout.getAIFix', async (document: vscode.TextDocument, diagnostic: AccessibilityDiagnostic) => {
-	try {
-		if (!diagnostic.data || !diagnostic.range) {
-			throw new Error('No accessibility data or range found in diagnostic');
-		}
-
-		const { violation, node } = diagnostic.data;
-		
-		// Get AI fix for the specific node HTML
-		const fixedCode = await aiService.getAccessibilityFix(node.html || '', {
-			id: violation.id,
-			description: violation.description,
-			help: violation.help,
-			impact: violation.impact || 'moderate'
-		});
-
-		if (!fixedCode) {
-			throw new Error('No fix was generated');
-		}
-
-		// Validate the fix
-		const isValid = await aiService.validateFix(fixedCode as string, {
-			id: violation.id,
-			description: violation.description,
-			help: violation.help
-		});
-
-		if (isValid) {
-			// Create a workspace edit
-			const edit = new vscode.WorkspaceEdit();
-			
-			// For main landmark issues, replace the entire document
-			if (violation.id === 'landmark-one-main') {
-				edit.replace(
-					document.uri,
-					new vscode.Range(
-						document.positionAt(0),
-						document.positionAt(document.getText().length)
-					),
-					fixedCode as string
-				);
-			} else {
-				// For other issues, find the exact location of the element using the node's target
-				const documentText = document.getText();
-				const nodeHtml = node.html || '';
-				const startIndex = documentText.indexOf(nodeHtml);
-				
-				if (startIndex === -1) {
-					throw new Error('Could not find the element in the document');
-				}
-				
-				const endIndex = startIndex + nodeHtml.length;
-				const startPosition = document.positionAt(startIndex);
-				const endPosition = document.positionAt(endIndex);
-				
-				edit.replace(
-					document.uri,
-					new vscode.Range(startPosition, endPosition),
-					fixedCode as string
-				);
-			}
-
-			// Apply the edit
-			await vscode.workspace.applyEdit(edit);
-			
-			// The file change watcher will automatically trigger a re-analysis
-			vscode.window.showInformationMessage('Accessibility fix applied successfully!');
-		} else {
-			vscode.window.showWarningMessage('AI generated fix was not valid. Please review manually.');
-		}
-	} catch (error) {
-		console.error('[Scout] Error in getAIFix command:', error instanceof Error ? error.message : 'Unknown error');
-		vscode.window.showErrorMessage("Error getting AI fix");
-	}
-});
