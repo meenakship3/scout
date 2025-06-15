@@ -425,16 +425,31 @@ vscode.commands.registerCommand('scout.getAIFix', async (document: vscode.TextDo
 			throw new Error('No fix was generated');
 		}
 
-		// Validate the fix for the specific snippet
-		const isValid = await aiService.validateFix(node.html || '', fixedCode as string, {
+		// Validate the fix
+		const isValid = await aiService.validateFix(fixedCode as string, {
 			id: violation.id,
-			description: violation.description
+			description: violation.description,
+			help: violation.help
 		});
 
 		if (isValid) {
-			// Create a workspace edit to replace only the problematic element
+			// Create a workspace edit
 			const edit = new vscode.WorkspaceEdit();
-			edit.replace(document.uri, diagnostic.range, fixedCode as string);
+			
+			// For main landmark issues, replace the entire document
+			if (violation.id === 'landmark-one-main') {
+				edit.replace(
+					document.uri,
+					new vscode.Range(
+						document.positionAt(0),
+						document.positionAt(document.getText().length)
+					),
+					fixedCode as string
+				);
+			} else {
+				// For other issues, replace only the problematic element
+				edit.replace(document.uri, diagnostic.range, fixedCode as string);
+			}
 
 			// Apply the edit
 			await vscode.workspace.applyEdit(edit);

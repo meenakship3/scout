@@ -5,6 +5,7 @@ export class AIService {
     private client: MistralClient | null = null;
 
     constructor() {
+        console.log('[Scout AI Service] Initializing AI service...');
         this.initializeClient();
     }
 
@@ -13,16 +14,23 @@ export class AIService {
         const apiKey = config.get<string>('mistralApiKey');
 
         if (apiKey) {
+            console.log('[Scout AI Service] API key found, initializing MistralAI client');
             this.client = new MistralClient(apiKey);
+        } else {
+            console.warn('[Scout AI Service] No API key found in settings');
         }
     }
 
     public async testConnection(prompt: string): Promise<boolean> {
+        console.log('[Scout AI Service] Testing connection with prompt:', prompt);
+        
         if (!this.client) {
+            console.error('[Scout AI Service] Client not initialized for connection test');
             throw new Error('MistralAI client not initialized. Please set your API key in settings.');
         }
 
         try {
+            console.log('[Scout AI Service] Sending test request to MistralAI...');
             const response = await this.client.chat({
                 model: 'mistral-small',
                 messages: [
@@ -34,9 +42,11 @@ export class AIService {
                 temperature: 0.1
             });
 
-            return response.choices[0]?.message?.content !== undefined;
+            const success = response.choices[0]?.message?.content !== undefined;
+            console.log('[Scout AI Service] Connection test result:', success);
+            return success;
         } catch (error) {
-            console.error('Error testing connection:', error);
+            console.error('[Scout AI Service] Connection test failed:', error);
             throw error;
         }
     }
@@ -50,117 +60,174 @@ export class AIService {
             impact: string;
         }
     ): Promise<string | null> {
+        console.log('[Scout AI Service] Getting accessibility fix for issue:', issue.id);
+        console.log('[Scout AI Service] Issue details:', {
+            description: issue.description,
+            help: issue.help,
+            impact: issue.impact
+        });
+
         if (!this.client) {
-            console.error('[Scout] MistralAI client not initialized');
+            console.error('[Scout AI Service] Client not initialized for fix generation');
             throw new Error('MistralAI client not initialized. Please set your API key in settings.');
         }
 
         try {
-            // Specialized prompt for main landmark issue
+            // Initialize prompt variable
             let prompt: string;
-            if (issue.id === 'landmark-one-main') {
-                prompt = `You are an expert web developer with extensive experience in web accessibility. The following HTML code is missing a main landmark, which is required for accessibility. Your task is to:
-1. Identify all content that should be inside the main landmark (typically everything between the header and footer, excluding navigation elements)
-2. Wrap that content in a single <main> tag
-3. Preserve all existing content and structure
-4. Ensure the <main> tag is placed at the correct level in the document hierarchy
 
-Here is the code:
+            // Specialized prompt for list items
+            if (issue.id === 'listitem') {
+                console.log('[Scout AI Service] Using specialized prompt for list items');
+                prompt = `You are an expert web developer with extensive experience in improving web accessibility.
+
+Fix this list item accessibility issue:
 ${originalNodeHtml}
 
-Important Notes:
-- The <main> element should be a direct child of <body>, <div>, or <form> elements
-- There should be only one <main> element in the document
-- The <main> element should not be a descendant of <article>, <aside>, <footer>, <header>, or <nav> elements
-- All primary content should be inside the <main> element
-- Navigation elements and supplementary content should remain outside the <main> element
-
-Return only the fixed HTML. Do not include any explanations, comments, or additional text outside of the HTML.`;
+Instructions:
+- Wrap the <li> in <ul> (unordered) or <ol> (ordered)
+- Keep existing content and attributes
+- Return only the fixed HTML`;
             } else {
-                prompt = `You are an expert in web development, with specialized knowledge in web accessibility. Your role is to ensure that all web content and interfaces are usable by as many people as possible, including those with disabilities. You will be provided with an HTML snippet representing a specific element that has an accessibility issue. Your task is to fix the accessibility issue by returning *only* the corrected HTML for that element. Apply best practices for web accessibility as defined by the latest WCAG (Web Content Accessibility Guidelines), and ensure your solutions are consistent with modern web development standards.
-
-Issue: ${issue.description}
-Impact: ${issue.impact}
-Help: ${issue.help}
-
-Original HTML element snippet:
-${originalNodeHtml}
-
-Return only the fixed HTML for the element. Do not include any explanations, comments, or additional text outside of the HTML. The response must be a complete and valid HTML snippet for the element that resolves the stated accessibility issue. Ensure that:
-1. The original tag name (e.g., div, img, p) is preserved unless explicitly required for the fix (e.g., changing a div to a button for semantic correctness).
-2. Only the necessary modifications are made to fix the accessibility issue.
-3. The returned HTML is syntactically correct and well-formed.`;
+                throw new Error(`Unsupported issue type: ${issue.id}`);
             }
 
-            const response = await this.client.chat({
+            console.log('[Scout AI Service] Request configuration:', {
                 model: 'mistral-small',
-                messages: [
-                    {
-                        role: 'user',
-                        content: prompt
-                    }
-                ],
+                messageLength: prompt.length,
                 temperature: 0.1
             });
 
-            if (!response.choices?.[0]?.message?.content) {
-                throw new Error('No fix was generated by the AI');
+            // Verify message length before sending
+            if (prompt.length > 4000) {
+                throw new Error(`Prompt is too long (${prompt.length} characters). Maximum allowed is 4000 characters.`);
             }
 
-            return response.choices[0].message.content;
+            try {
+                const response = await this.client.chat({
+                    model: 'mistral-small',
+                    messages: [
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    temperature: 0.1
+                });
+
+                console.log('[Scout AI Service] Received response from MistralAI:', {
+                    hasChoices: !!response.choices,
+                    choiceCount: response.choices?.length,
+                    hasMessage: !!response.choices?.[0]?.message,
+                    hasContent: !!response.choices?.[0]?.message?.content,
+                    responseType: typeof response.choices?.[0]?.message?.content,
+                    content: response.choices?.[0]?.message?.content
+                });
+
+                if (!response.choices?.[0]?.message?.content) {
+                    throw new Error('No content in AI response');
+                }
+
+                const fix = response.choices[0].message.content;
+                console.log('[Scout AI Service] Successfully received fix from AI');
+                console.log('[Scout AI Service] Fix content:', fix);
+
+                // Validate the fix
+                console.log('[Scout AI Service] Validating fix for issue:', issue.id);
+                const isValid = await this.validateFix(fix, issue);
+                console.log('[Scout AI Service] Validation result:', isValid);
+                if (!isValid) {
+                    console.log('[Scout AI Service] Validation failed. Fix content:', fix);
+                    throw new Error('AI generated fix failed validation');
+                }
+
+                return fix;
+            } catch (error) {
+                console.error('[Scout AI Service] Detailed error in MistralAI request:', {
+                    error: error instanceof Error ? {
+                        name: error.name,
+                        message: error.message,
+                        stack: error.stack
+                    } : error,
+                    prompt: prompt.substring(0, 100) + '...', // Log first 100 chars of prompt
+                    clientStatus: {
+                        isInitialized: !!this.client,
+                        apiKeyPresent: !!vscode.workspace.getConfiguration('scout').get<string>('mistralApiKey')
+                    }
+                });
+                throw error;
+            }
         } catch (error) {
-            console.error('[Scout] Error getting AI fix:', error instanceof Error ? error.message : 'Unknown error');
+            console.error('[Scout AI Service] Error in getAccessibilityFix:', error);
             throw error;
         }
     }
 
+    private isValidString(value: unknown): value is string {
+        return typeof value === 'string' && value.length > 0;
+    }
+
     public async validateFix(
-        originalSnippet: string,
-        fixedSnippet: string,
+        fix: string,
         issue: {
             id: string;
             description: string;
+            help: string;
         }
     ): Promise<boolean> {
-        if (!this.client) {
-            throw new Error('MistralAI client not initialized. Please set your API key in settings.');
-        }
-
         try {
-            const prompt = `You are an accessibility expert. Validate if the following fixed HTML snippet correctly addresses the accessibility issue when replacing the original snippet:
+            console.log('[Scout AI Service] Sending validation request to MistralAI...');
+            console.log('[Scout AI Service] Fix to validate:', fix);
+            console.log('[Scout AI Service] Issue details:', {
+                id: issue.id,
+                description: issue.description,
+                help: issue.help
+            });
 
-Issue: ${issue.description}
-
-Original HTML snippet:
-${originalSnippet}
-
-Fixed HTML snippet:
-${fixedSnippet}
-
-Check the following:
-1. The fixed snippet addresses the specific accessibility issue.
-2. The fixed snippet is valid and well-formed HTML.
-3. The fixed snippet maintains the original functionality where applicable.
-4. The fixed snippet follows WCAG guidelines.
-
-Respond with only "true" if all checks pass, or "false" if any check fails.`;
-
+            // @ts-ignore - TypeScript is being overly cautious about null checks
             const response = await this.client.chat({
                 model: 'mistral-small',
-                messages: [
-                    {
-                        role: 'user',
-                        content: prompt
-                    }
-                ],
+                messages: [{
+                    role: 'user',
+                    content: `Validate this HTML fix for accessibility issue "${issue.id}":
+                    Issue: ${issue.description}
+                    Help: ${issue.help}
+                    Fix: ${fix}
+                    
+                    Respond with ONLY "true" if the fix is valid, or "false" if it's invalid.`
+                }],
                 temperature: 0.1
             });
 
-            const answer = response.choices[0]?.message?.content?.toLowerCase().trim();
-            return answer === 'true';
+            if (!response?.choices?.[0]?.message?.content) {
+                console.error('[Scout AI Service] Invalid response structure:', JSON.stringify(response, null, 2));
+                return false;
+            }
+
+            const validationResponse = response.choices[0].message.content;
+            console.log('[Scout AI Service] Raw validation response:', validationResponse);
+            
+            // Extract the first word and check if it's "true" (case insensitive)
+            const firstWord = validationResponse.trim().split(/\s+/)[0].toLowerCase();
+            const isValid = firstWord === 'true';
+            
+            console.log('[Scout AI Service] Validation result:', {
+                rawResponse: validationResponse,
+                firstWord,
+                parsedResult: isValid
+            });
+            
+            return isValid;
         } catch (error) {
-            console.error('Error validating fix:', error);
-            throw error;
+            console.error('[Scout AI Service] Error validating fix:', error);
+            if (error instanceof Error) {
+                console.error('[Scout AI Service] Error details:', {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack
+                });
+            }
+            return false;
         }
     }
 } 
