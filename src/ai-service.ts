@@ -118,6 +118,20 @@ Instructions:
 - Keep existing content and attributes
 - Return ONLY the fixed HTML, no explanations or alternatives
 - Do not include markdown code blocks or backticks`;
+            } else if (issue.id === 'label') {
+                console.log('[Scout AI Service] Using specialized prompt for form labels');
+                prompt = `You are an expert web developer with extensive experience in improving web accessibility.
+
+Add an accessible label to this form input:
+${originalNodeHtml}
+
+Instructions:
+-The input element MUST be wrapped inside a <label> tag.
+-The label text MUST come before the input element.
+-Generate label text using the input's name or type attribute (e.g., "Username" if name="username", "Text input" if type="text").
+-If both name and type are missing, leave the label text empty.
+-The structure MUST be: <label>Label Text<input type="text" name="fieldname"></label>
+Return ONLY the fixed HTML.`;
             } else {
                 throw new Error(`Unsupported issue type: ${issue.id}`);
             }
