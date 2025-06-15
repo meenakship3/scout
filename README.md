@@ -1,13 +1,24 @@
-# Scout - VS Code Accessibility Assistant
+# Scout – Your AI Accessibility Helper 🐾
 
-Scout is a VS Code extension that helps developers improve the accessibility of their web projects by automatically checking for common accessibility issues in HTML and JSX files.
+Meet Scout: your friendly dachshund sidekick for web accessibility! Scout sniffs out and fixes common issues like missing labels, alt text, and list structures—right inside your VS Code editor.
 
-## Features
+## What Scout Does
 
-- Scans HTML and JSX files for accessibility issues
-- Provides real-time feedback on accessibility problems
-- Suggests fixes for detected issues
-- Supports HTML, JSX, and TSX files
+- **Scans** HTML files for accessibility problems
+- **Powered by axe-core** for reliable, standards-based issue detection
+- **Uses MistralAI** to suggest and apply smart fixes with just a click
+- **Keyboard shortcuts** make scanning and fixing even faster
+
+## Why Accessibility Matters
+
+Making your site accessible means everyone, including people with disabilities, can use it. It’s not just good practice—it’s essential for inclusive web development.
+
+## Get Started
+
+1. **Install Scout** from the VS Code marketplace
+2. **Add your MistralAI API key** in settings
+3. **Open your files** and use the command palette to “Scout: Scan & Fix”
+4. **Use keyboard shortcuts** to quickly scan or fix issues (check settings for your preferred bindings)
 
 ## Requirements
 
@@ -19,37 +30,10 @@ This extension contributes the following settings:
 
 * `scout.enable`: Enable/disable the extension
 
-## Known Issues
+## Join the Pack
 
-None at the moment.
-
-## Release Notes
-
-### 0.0.1
-
-Initial release of Scout:
-- Basic extension structure
-- Workspace scanning command
+Contributors welcome! Help Scout make the web a friendlier place for all.
 
 ---
 
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Made with 🐾 by Meenakshi
