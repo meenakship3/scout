@@ -3,6 +3,7 @@
   "displayName": "Scout",
   "description": "AI powered web accessibility assistant for VS Code",
   "version": "0.0.1",
+  "icon": "icon.png",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
