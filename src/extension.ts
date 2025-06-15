@@ -35,14 +35,61 @@ const webviewPanels = new Map<string, vscode.WebviewPanel>();
 let accessibilityDiagnostics: vscode.DiagnosticCollection;
 let aiService: AIService;
 
+// Store the extension context globally
+let extensionContext: vscode.ExtensionContext;
+
+// Function to re-run accessibility analysis for a file
+async function reRunAnalysisForFile(filePath: string) {
+	const panel = webviewPanels.get(filePath);
+	if (panel) {
+		try {
+			// Read the current file content
+			const content = await fs.promises.readFile(filePath, 'utf8');
+			
+			// Update the webview content
+			panel.webview.html = getWebviewContent(content, extensionContext, panel.webview);
+			
+			// Send message to re-run analysis
+			panel.webview.postMessage({ type: 'reRunAnalysis' });
+		} catch (error) {
+			console.error(`Error re-running analysis for ${filePath}:`, error);
+		}
+	}
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+	extensionContext = context;
 	console.log('Scout accessibility assistant is now active');
 
 	// Initialize services
 	accessibilityDiagnostics = vscode.languages.createDiagnosticCollection('accessibility');
 	aiService = new AIService();
+
+	// Create a file system watcher for HTML files
+	const fileWatcher = vscode.workspace.createFileSystemWatcher('**/*.html');
+	
+	// Watch for file changes
+	fileWatcher.onDidChange(async (uri) => {
+		const filePath = uri.fsPath;
+		// Clear existing diagnostics for this file
+		accessibilityDiagnostics.delete(uri);
+		// Re-run analysis
+		await reRunAnalysisForFile(filePath);
+	});
+
+	// Watch for file deletions
+	fileWatcher.onDidDelete((uri) => {
+		// Remove diagnostics when file is deleted
+		accessibilityDiagnostics.delete(uri);
+	});
+
+	// Watch for file creations
+	fileWatcher.onDidCreate(async (uri) => {
+		const filePath = uri.fsPath;
+		await reRunAnalysisForFile(filePath);
+	});
 
 	// Register the scan workspace command
 	const scanCommand = vscode.commands.registerCommand('scout.scanWorkspace', async () => {
@@ -108,7 +155,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
-	context.subscriptions.push(scanCommand, codeActionProvider, verifyApiKeyCommand);
+	context.subscriptions.push(scanCommand, codeActionProvider, verifyApiKeyCommand, fileWatcher);
 }
 
 // Display file content in a webview panel
@@ -196,7 +243,9 @@ function getWebviewContent(htmlContent: string, context: vscode.ExtensionContext
 			<script>
 				(function() {
 					const vscode = acquireVsCodeApi();
-					(async function() {
+					
+					// Function to run accessibility analysis
+					async function runAnalysis() {
 						try {
 							// Run axe-core analysis
 							const results = await axe.run(document);
@@ -209,7 +258,20 @@ function getWebviewContent(htmlContent: string, context: vscode.ExtensionContext
 						} catch (error) {
 							console.error('Error running accessibility analysis:', error);
 						}
-					})();
+					}
+
+					// Run initial analysis
+					runAnalysis();
+
+					// Listen for messages from the extension
+					window.addEventListener('message', event => {
+						const message = event.data;
+						switch (message.type) {
+							case 'reRunAnalysis':
+								runAnalysis();
+								break;
+						}
+					});
 				})();
 			</script>
 		</body>
@@ -376,6 +438,8 @@ vscode.commands.registerCommand('scout.getAIFix', async (document: vscode.TextDo
 
 			// Apply the edit
 			await vscode.workspace.applyEdit(edit);
+			
+			// The file change watcher will automatically trigger a re-analysis
 			vscode.window.showInformationMessage('Accessibility fix applied successfully!');
 		} else {
 			vscode.window.showWarningMessage('AI generated fix was not valid. Please review manually.');

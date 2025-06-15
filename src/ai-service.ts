@@ -56,7 +56,28 @@ export class AIService {
         }
 
         try {
-            const prompt = `You are an expert in web development, with specialized knowledge in web accessibility. Your role is to ensure that all web content and interfaces are usable by as many people as possible, including those with disabilities. You will be provided with an HTML snippet representing a specific element that has an accessibility issue. Your task is to fix the accessibility issue by returning *only* the corrected HTML for that element. Apply best practices for web accessibility as defined by the latest WCAG (Web Content Accessibility Guidelines), and ensure your solutions are consistent with modern web development standards.
+            // Specialized prompt for main landmark issue
+            let prompt: string;
+            if (issue.id === 'landmark-one-main') {
+                prompt = `You are an expert web developer with extensive experience in web accessibility. The following HTML code is missing a main landmark, which is required for accessibility. Your task is to:
+1. Identify all content that should be inside the main landmark (typically everything between the header and footer, excluding navigation elements)
+2. Wrap that content in a single <main> tag
+3. Preserve all existing content and structure
+4. Ensure the <main> tag is placed at the correct level in the document hierarchy
+
+Here is the code:
+${originalNodeHtml}
+
+Important Notes:
+- The <main> element should be a direct child of <body>, <div>, or <form> elements
+- There should be only one <main> element in the document
+- The <main> element should not be a descendant of <article>, <aside>, <footer>, <header>, or <nav> elements
+- All primary content should be inside the <main> element
+- Navigation elements and supplementary content should remain outside the <main> element
+
+Return only the fixed HTML. Do not include any explanations, comments, or additional text outside of the HTML.`;
+            } else {
+                prompt = `You are an expert in web development, with specialized knowledge in web accessibility. Your role is to ensure that all web content and interfaces are usable by as many people as possible, including those with disabilities. You will be provided with an HTML snippet representing a specific element that has an accessibility issue. Your task is to fix the accessibility issue by returning *only* the corrected HTML for that element. Apply best practices for web accessibility as defined by the latest WCAG (Web Content Accessibility Guidelines), and ensure your solutions are consistent with modern web development standards.
 
 Issue: ${issue.description}
 Impact: ${issue.impact}
@@ -69,6 +90,7 @@ Return only the fixed HTML for the element. Do not include any explanations, com
 1. The original tag name (e.g., div, img, p) is preserved unless explicitly required for the fix (e.g., changing a div to a button for semantic correctness).
 2. Only the necessary modifications are made to fix the accessibility issue.
 3. The returned HTML is syntactically correct and well-formed.`;
+            }
 
             const response = await this.client.chat({
                 model: 'mistral-small',
