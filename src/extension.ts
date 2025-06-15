@@ -101,7 +101,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const scanCommand = vscode.commands.registerCommand('scout.scanWorkspace', async () => {
 		try {
 			// Show message immediately
-			const messageDisposable = vscode.window.setStatusBarMessage('Searching for HTML/JSX/TSX files...');
+			const messageDisposable = vscode.window.setStatusBarMessage('🐾 Searching for HTML files...');
 			
 			// Search for files
 			const files = await findRelevantFiles();
@@ -110,7 +110,7 @@ export function activate(context: vscode.ExtensionContext) {
 			messageDisposable.dispose();
 
 			if (files.length === 0) {
-				vscode.window.showInformationMessage('No HTML/JSX/CSS files found in the workspace.');
+				vscode.window.showInformationMessage('🐾 No HTML files found in the workspace.');
 				return;
 			}
 
@@ -134,7 +134,7 @@ export function activate(context: vscode.ExtensionContext) {
 				}
 			}
 		} catch (error) {
-			vscode.window.showErrorMessage(`Error scanning workspace: ${error}`);
+			vscode.window.showErrorMessage(`🐾 Error scanning workspace: ${error}`);
 		}
 	});
 
@@ -154,7 +154,7 @@ export function activate(context: vscode.ExtensionContext) {
 			const apiKey = config.get<string>('mistralApiKey');
 
 			if (!apiKey) {
-				vscode.window.showErrorMessage('MistralAI API key not found. Please set it in your user settings.');
+				vscode.window.showErrorMessage('🐾 MistralAI API key not found. Please set it in your user settings.');
 				return;
 			}
 
@@ -163,10 +163,10 @@ export function activate(context: vscode.ExtensionContext) {
 			const response = await aiService.testConnection(testPrompt);
 			
 			if (response) {
-				vscode.window.showInformationMessage('MistralAI API key is valid and working!');
+				vscode.window.showInformationMessage('🐾 MistralAI API key is valid and working!');
 			}
 		} catch (error) {
-			vscode.window.showErrorMessage(`API key verification failed: ${error}`);
+			vscode.window.showErrorMessage(`🐾 API key verification failed: ${error}`);
 		}
 	});
 
@@ -180,7 +180,7 @@ export function activate(context: vscode.ExtensionContext) {
 			const { violation, node } = diagnostic.data;
 			
 			// Show in-progress message
-			vscode.window.showInformationMessage('Analyzing and fixing the accessibility issue...');
+			vscode.window.showInformationMessage('🐾 Scout is analyzing and fixing the accessibility issue...');
 
 			// Get AI fix for the specific node HTML
 			const fixedCode = await aiService.getAccessibilityFix(node.html || '', {
@@ -269,7 +269,7 @@ export function activate(context: vscode.ExtensionContext) {
 				
 				// Show message with buttons
 				const message = await vscode.window.showInformationMessage(
-					'Accessibility fix applied successfully!',
+					'🐾 Scout sniffed out the accessibility issue and fixed it!',
 					{ modal: false },
 					'Accept Changes',
 					'Reject Changes'
@@ -289,9 +289,9 @@ export function activate(context: vscode.ExtensionContext) {
 					);
 					const success = await vscode.workspace.applyEdit(undoEdit);
 					if (success) {
-						vscode.window.showInformationMessage('Changes have been reverted.');
+						vscode.window.showInformationMessage('🐾 Scout has rolled back those changes!');
 					} else {
-						vscode.window.showErrorMessage('Failed to revert changes.');
+						vscode.window.showErrorMessage('🐾 Scout failed to revert changes.');
 					}
 				} else { // User accepted changes or dismissed the message
 					// Save the document
@@ -307,7 +307,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		} catch (error) {
 			console.error('[Scout] Error in getAIFix command:', error instanceof Error ? error.message : 'Unknown error');
-			vscode.window.showErrorMessage("Error getting AI fix");
+			vscode.window.showErrorMessage("🐾 Uh-oh! Scout ran into a problem while getting the AI fix.");
 		}
 	});
 
@@ -318,7 +318,7 @@ export function activate(context: vscode.ExtensionContext) {
 			if (!document) {
 				const activeEditor = vscode.window.activeTextEditor;
 				if (!activeEditor) {
-					vscode.window.showErrorMessage('No active editor found. Please open an HTML/JSX/TSX file.');
+					vscode.window.showErrorMessage('🐾 No active editor found. Please open an HTML/JSX/TSX file.');
 					return;
 				}
 				document = activeEditor.document;
@@ -326,7 +326,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 			// Ensure we have a valid document
 			if (!document) {
-				vscode.window.showErrorMessage('No valid document found. Please open an HTML/JSX/TSX file.');
+				vscode.window.showErrorMessage('🐾 No valid document found. Please open an HTML/JSX/TSX file.');
 				return;
 			}
 
@@ -338,7 +338,7 @@ export function activate(context: vscode.ExtensionContext) {
 			const filteredDiagnostics = allDiagnostics.filter((d: vscode.Diagnostic) => d.source === 'Accessibility') as AccessibilityDiagnostic[];
 
 			if (filteredDiagnostics.length === 0) {
-				vscode.window.showInformationMessage('No accessibility issues found to fix.');
+				vscode.window.showInformationMessage("🐾 Scout did not find any accessibility issues. Good job!");
 				return;
 			}
 
@@ -456,7 +456,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 			if (fixResult.status === 'fixed') {
 				const message = await vscode.window.showInformationMessage(
-					`Successfully fixed ${fixResult.count} accessibility issues!`,
+					`🐾 Scout fixed ${fixResult.count} accessibility issues!`,
 					{ modal: false },
 					'Accept Changes',
 					'Reject Changes'
@@ -476,9 +476,9 @@ export function activate(context: vscode.ExtensionContext) {
 					);
 					const success = await vscode.workspace.applyEdit(undoEdit);
 					if (success) {
-						vscode.window.showInformationMessage('All changes have been reverted.');
+						vscode.window.showInformationMessage('🐾 Scout rolled back those changes.');
 					} else {
-						vscode.window.showErrorMessage('Failed to revert changes.');
+						vscode.window.showErrorMessage('🐾 Uh-oh! Scout could not rollback the changes.');
 					}
 				} else { // User accepted changes or dismissed the message
 					// Save the document
@@ -492,11 +492,11 @@ export function activate(context: vscode.ExtensionContext) {
 			} else if (fixResult.status === 'no_fixes') {
 				vscode.window.showWarningMessage('No accessibility issues were fixed.');
 			} else if (fixResult.status === 'cancelled') {
-				vscode.window.showInformationMessage(`Fix All operation cancelled. ${fixResult.count} issues were fixed before cancellation.`);
+				vscode.window.showInformationMessage(`🐾 Scout cancelled the fix. ${fixResult.count} issues were fixed before cancellation.`);
 			}
 		} catch (error) {
 			console.error('[Scout] Error in fixAll command:', error instanceof Error ? error.message : 'Unknown error');
-			vscode.window.showErrorMessage("Error fixing accessibility issues");
+			vscode.window.showErrorMessage("🐾 Uh-oh! Scout ran into a problem while fetching fixes. Please try again.");
 		}
 	});
 
