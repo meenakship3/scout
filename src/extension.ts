@@ -218,11 +218,11 @@ export function activate(context: vscode.ExtensionContext) {
 					);
 				}
 
+				// Store the original content before making changes
+				const originalContent = document.getText();
+				
 				// Apply the edit
 				await vscode.workspace.applyEdit(edit);
-				
-				// Store the original content for potential undo
-				const originalContent = document.getText();
 				
 				// Show message with buttons
 				const message = await vscode.window.showInformationMessage(
@@ -233,6 +233,7 @@ export function activate(context: vscode.ExtensionContext) {
 				);
 
 				if (message === 'Reject Changes') {
+					console.log('[Scout] Reverting changes...');
 					// Create a new edit to revert the changes
 					const undoEdit = new vscode.WorkspaceEdit();
 					undoEdit.replace(
@@ -243,8 +244,12 @@ export function activate(context: vscode.ExtensionContext) {
 						),
 						originalContent
 					);
-					await vscode.workspace.applyEdit(undoEdit);
-					vscode.window.showInformationMessage('Changes have been reverted.');
+					const success = await vscode.workspace.applyEdit(undoEdit);
+					if (success) {
+						vscode.window.showInformationMessage('Changes have been reverted.');
+					} else {
+						vscode.window.showErrorMessage('Failed to revert changes.');
+					}
 				}
 			} else {
 				vscode.window.showWarningMessage('AI generated fix was not valid. Please review manually.');
