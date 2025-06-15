@@ -89,7 +89,7 @@ Instructions:
 - Keep existing content and attributes
 - Return ONLY the fixed HTML, no explanations or alternatives
 - Do not include markdown code blocks or backticks
-- Do not provide multiple options, just use <ol>`;
+- Do not provide multiple options, just use <ul>`;
             } else if (issue.id === 'image-alt') {
                 console.log('[Scout AI Service] Using specialized prompt for image alt text');
                 prompt = `You are an expert web developer with extensive experience in improving web accessibility.
@@ -103,21 +103,6 @@ Instructions:
 - Do not include "image of" or "picture of"
 - Keep existing attributes
 - Return only the fixed HTML (no explanations, no markdown, no alternatives)`;
-            } else if (issue.id === 'region') {
-                console.log('[Scout AI Service] Using specialized prompt for region landmark');
-                prompt = `You are an expert web developer with extensive experience in improving web accessibility.
-
-Fix this region landmark issue:
-${originalNodeHtml}
-
-Instructions:
-- Wrap the content in a <main> element if it's the main content
-- Or wrap in a <nav> element if it's navigation
-- Or wrap in a <aside> element if it's complementary content
-- Or wrap in a <section> element with appropriate ARIA role if it's a distinct section
-- Keep existing content and attributes
-- Return ONLY the fixed HTML, no explanations or alternatives
-- Do not include markdown code blocks or backticks`;
             } else if (issue.id === 'label') {
                 console.log('[Scout AI Service] Using specialized prompt for form labels');
                 prompt = `You are an expert web developer with extensive experience in improving web accessibility.

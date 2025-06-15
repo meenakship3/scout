@@ -14,6 +14,11 @@ interface AccessibilityDiagnostic extends vscode.Diagnostic {
 	};
 }
 
+type FixAllResult = 
+	| { status: 'fixed'; count: number; originalContent: string }
+	| { status: 'no_fixes'; count: 0 }
+	| { status: 'cancelled'; count: number; originalContent: string };
+
 // File patterns to scan
 const SCAN_PATTERNS = ['**/*.html'];
 
@@ -250,6 +255,8 @@ export function activate(context: vscode.ExtensionContext) {
 					} else {
 						vscode.window.showErrorMessage('Failed to revert changes.');
 					}
+				} else { // User accepted changes or dismissed the message
+					await document.save();
 				}
 			} else {
 				vscode.window.showWarningMessage('AI generated fix was not valid. Please review manually.');
@@ -273,7 +280,7 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 
 			// Show progress
-			await vscode.window.withProgress({
+			const fixResult: FixAllResult = await vscode.window.withProgress({
 				location: vscode.ProgressLocation.Notification,
 				title: "Fixing accessibility issues...",
 				cancellable: true
@@ -281,11 +288,12 @@ export function activate(context: vscode.ExtensionContext) {
 				// Create a workspace edit to hold all changes
 				const edit = new vscode.WorkspaceEdit();
 				let fixedCount = 0;
+				const originalContentBeforeFix = document.getText(); // Capture content before any changes
 
 				// Process each diagnostic
 				for (const diagnostic of filteredDiagnostics) {
 					if (token.isCancellationRequested) {
-						break;
+						return { status: 'cancelled', count: fixedCount, originalContent: originalContentBeforeFix };
 					}
 
 					if (!diagnostic.data || !diagnostic.range) {
@@ -351,11 +359,46 @@ export function activate(context: vscode.ExtensionContext) {
 				// Apply all changes at once
 				if (fixedCount > 0) {
 					await vscode.workspace.applyEdit(edit);
-					vscode.window.showInformationMessage(`Successfully fixed ${fixedCount} accessibility issues!`);
+					return { status: 'fixed', count: fixedCount, originalContent: originalContentBeforeFix };
 				} else {
-					vscode.window.showWarningMessage('No accessibility issues were fixed.');
+					return { status: 'no_fixes', count: 0 };
 				}
 			});
+
+			if (fixResult.status === 'fixed') {
+				const message = await vscode.window.showInformationMessage(
+					`Successfully fixed ${fixResult.count} accessibility issues!`,
+					{ modal: false },
+					'Accept Changes',
+					'Reject Changes'
+				);
+
+				if (message === 'Reject Changes') {
+					console.log('[Scout] Reverting all changes...');
+					// Create a new edit to revert the changes
+					const undoEdit = new vscode.WorkspaceEdit();
+					undoEdit.replace(
+						document.uri,
+						new vscode.Range(
+							document.positionAt(0),
+							document.positionAt(document.getText().length)
+						),
+						fixResult.originalContent
+					);
+					const success = await vscode.workspace.applyEdit(undoEdit);
+					if (success) {
+						vscode.window.showInformationMessage('All changes have been reverted.');
+					} else {
+						vscode.window.showErrorMessage('Failed to revert changes.');
+					}
+				} else { // User accepted changes or dismissed the message
+					await document.save();
+				}
+			} else if (fixResult.status === 'no_fixes') {
+				vscode.window.showWarningMessage('No accessibility issues were fixed.');
+			} else if (fixResult.status === 'cancelled') {
+				vscode.window.showInformationMessage(`Fix All operation cancelled. ${fixResult.count} issues were fixed before cancellation.`);
+			}
 		} catch (error) {
 			console.error('[Scout] Error in fixAll command:', error instanceof Error ? error.message : 'Unknown error');
 			vscode.window.showErrorMessage("Error fixing accessibility issues");
