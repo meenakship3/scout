@@ -85,9 +85,11 @@ Fix this list item accessibility issue:
 ${originalNodeHtml}
 
 Instructions:
-- Wrap the <li> in <ul> (unordered) or <ol> (ordered)
+- Wrap the <li> in an <ol> (ordered list) element
 - Keep existing content and attributes
-- Return only the fixed HTML`;
+- Return ONLY the fixed HTML, no explanations or alternatives
+- Do not include markdown code blocks or backticks
+- Do not provide multiple options, just use <ol>`;
             } else {
                 throw new Error(`Unsupported issue type: ${issue.id}`);
             }
@@ -128,9 +130,19 @@ Instructions:
                     throw new Error('No content in AI response');
                 }
 
-                const fix = response.choices[0].message.content;
-                console.log('[Scout AI Service] Successfully received fix from AI');
-                console.log('[Scout AI Service] Fix content:', fix);
+                // Clean up the response to get only the HTML
+                let fix = response.choices[0].message.content;
+                
+                // Remove markdown code blocks if present
+                fix = fix.replace(/```html\n?|\n?```/g, '');
+                
+                // Remove any explanatory text before or after the HTML
+                fix = fix.replace(/^[^<]*|[^>]*$/g, '');
+                
+                // Trim whitespace
+                fix = fix.trim();
+
+                console.log('[Scout AI Service] Cleaned fix content:', fix);
 
                 // Validate the fix
                 console.log('[Scout AI Service] Validating fix for issue:', issue.id);
@@ -208,7 +220,8 @@ Instructions:
             console.log('[Scout AI Service] Raw validation response:', validationResponse);
             
             // Extract the first word and check if it's "true" (case insensitive)
-            const firstWord = validationResponse.trim().split(/\s+/)[0].toLowerCase();
+            // Remove any punctuation and trim whitespace
+            const firstWord = validationResponse.trim().split(/\s+/)[0].toLowerCase().replace(/[.,!?]$/, '');
             const isValid = firstWord === 'true';
             
             console.log('[Scout AI Service] Validation result:', {
