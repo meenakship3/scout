@@ -8,6 +8,7 @@ Meet Scout: your friendly dachshund sidekick for web accessibility! Scout sniffs
 - **Powered by axe-core** for reliable, standards-based issue detection
 - **Uses MistralAI** to suggest and apply smart fixes with just a click
 - **Keyboard shortcuts** make scanning and fixing even faster
+- **Leverages native VS Code** features for a familiar developer experience 
 
 ## Why Accessibility Matters
 
@@ -15,10 +16,11 @@ Making your site accessible means everyone, including people with disabilities, 
 
 ## Get Started
 
-1. **Install Scout** from the VS Code marketplace
-2. **Add your MistralAI API key** in settings
-3. **Open your files** and use the command palette to “Scout: Scan & Fix”
-4. **Use keyboard shortcuts** to quickly scan or fix issues (check settings for your preferred bindings)
+1. **Download the VSIX file** from the demo branch
+2. **Install Scout** select “Install from VSIX” in the Extensions view of VSCode
+3. **Add your MistralAI API key** in settings
+4. **Verify your API key** using "Scout: Verify API Key"
+5. **Open your files** and use the command palette to “Scout: Scan Workspace for Accessibility Issues”
 
 ## Requirements
 
