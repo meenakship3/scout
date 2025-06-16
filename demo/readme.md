@@ -32,6 +32,7 @@
 5. **Scan Your Files**
 
    - Open your project in VS Code.
+   - You may use the test files in the `test-files` directory.
    - Open the Command Palette (`Ctrl+Shift+P`).
    - Type and select **Scout: Scan Workspace for Accessibility Issues**.
 
