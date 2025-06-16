@@ -296,11 +296,7 @@ export function activate(context: vscode.ExtensionContext) {
 				} else { // User accepted changes or dismissed the message
 					// Save the document
 					await document.save();
-					// Ensure the file is saved to disk
-					await vscode.workspace.fs.writeFile(
-						document.uri,
-						Buffer.from(document.getText())
-					);
+
 				}
 			} else {
 				vscode.window.showWarningMessage('AI generated fix was not valid. Please review manually.');
@@ -483,11 +479,6 @@ export function activate(context: vscode.ExtensionContext) {
 				} else { // User accepted changes or dismissed the message
 					// Save the document
 					await doc.save();
-					// Ensure the file is saved to disk
-					await vscode.workspace.fs.writeFile(
-						doc.uri,
-						Buffer.from(doc.getText())
-					);
 				}
 			} else if (fixResult.status === 'no_fixes') {
 				vscode.window.showWarningMessage('No accessibility issues were fixed.');

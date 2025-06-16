@@ -116,9 +116,14 @@ Instructions:
 -The input element MUST be wrapped inside a <label> tag.
 -The label text MUST come before the input element.
 -Generate label text using the input's name or type attribute (e.g., "Username" if name="username", "Text input" if type="text").
+-If both name and type exist, the name MUST be used to generate the label text.
 -If both name and type are missing, leave the label text empty.
--The structure MUST be: <label>Label Text<input type="text" name="fieldname"></label>
-Return ONLY the fixed HTML.`;
+-The structure MUST be: <label>Label Text<input type="typename" name="fieldname"></label>
+- Return ONLY the fixed HTML, no explanations or alternatives
+- Do not include markdown code blocks or backticks
+- Do not provide multiple options, just use <ul>
+- Do not include any text before or after the HTML
+- Do not explain what you did, just return the HTML`;
             } else {
                 throw new Error(`Unsupported issue type: ${issue.id}`);
             }
@@ -242,7 +247,7 @@ Review and enhance this alt text for better context. Learn more: https://accessi
                     Help: ${issue.help}
                     Fix: ${fix}
                     
-                    Respond with ONLY "true" if the fix is valid, or "false" if it's invalid.`
+                    Begin your response with ONLY "true" if the fix is valid, or "false" if it's invalid.`
                 }],
                 temperature: 0.1
             });
