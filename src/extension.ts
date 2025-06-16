@@ -151,12 +151,14 @@ export function activate(context: vscode.ExtensionContext) {
 	const verifyApiKeyCommand = vscode.commands.registerCommand('scout.verifyApiKey', async () => {
 		try {
 			const config = vscode.workspace.getConfiguration('scout');
-			const apiKey = process.env.MISTRALAI_API_KEY || config.get<string>('apiKey');
+			const apiKey = process.env.MISTRALAI_API_KEY || config.get<string>('mistralApiKey');
 
 			if (!apiKey) {
 				vscode.window.showErrorMessage('MistralAI API key not found. Please set it in your user settings.');
 				return;
 			}
+
+			vscode.window.showInformationMessage('Verifying MistralAI API key...');
 
 			// Test the API key with a simple request
 			const testPrompt = 'Test connection';
