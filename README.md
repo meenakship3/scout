@@ -8,7 +8,8 @@ Meet Scout: your friendly dachshund sidekick for web accessibility! Scout sniffs
 - **Powered by axe-core** for reliable, standards-based issue detection
 - **Uses MistralAI** to suggest and apply smart fixes with just a click
 - **Keyboard shortcuts** make scanning and fixing even faster
-- **Leverages native VS Code** features for a familiar developer experience 
+- **Leverages native VS Code** features for a familiar developer experience
+- **Accept or reject** fixes for full control
 
 ## Why Accessibility Matters
 
